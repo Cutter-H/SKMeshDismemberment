@@ -55,6 +55,27 @@ float USkeletalDismembermentMesh::GetBoneHealth(FName boneName) const
 	return -1.f;
 }
 
+void USkeletalDismembermentMesh::RebindPointDamage(FOnPointDamageTakenDel function){
+	if (CurrentRadialDelegate.IsBound()){
+		GetOwner()->OnTakeRadialDamage.Remove(CurrentRadialDelegate);
+	}
+	else{
+		GetOwner()->OnTakePointDamage.RemoveDynamic(this, &USkeletalDismembermentMesh::OnPointDamage);
+	}
+	GetOwner()->OnTakePointDamage.AddUnique(function);
+	CurrentPointDelegate = function;
+}
+void USkeletalDismembermentMesh::RebindRadialDamage(FOnRadialDamageTakenDel function) {
+	if (CurrentRadialDelegate.IsBound()){
+		GetOwner()->OnTakeRadialDamage.Remove(CurrentRadialDelegate);
+	}
+	else{
+		GetOwner()->OnTakeRadialDamage.RemoveDynamic(this, &USkeletalDismembermentMesh::OnRadialDamage);
+	}
+	GetOwner()->OnTakeRadialDamage.AddUnique(function);
+	CurrentRadialDelegate = function;
+}
+
 void USkeletalDismembermentMesh::SetProxySkeletalMeshComponent(USkeletalMeshComponent* proxyComponent)
 {
 	if (GetOwner()->GetLocalRole() == ROLE_Authority)
@@ -82,7 +103,7 @@ void USkeletalDismembermentMesh::OnRadialDamage(AActor* DamagedActor, float Dama
 	float actorDistance = FVector::Distance(Origin, GetOwner()->GetActorLocation());
 	for (FDismembermentRules boneRule : DismembermentBones)
 	{
-		if(!boneRule.bIgnoreRadialDamage && (actorDistance < FVector::Distance(GetSocketLocation(boneRule.BoneName), Origin)))
+		if(!boneRule.bIgnoreRadialDamage && (actorDistance > FVector::Distance(GetSocketLocation(boneRule.BoneName), Origin)))
 		{
 			FVector impulse = (GetSocketLocation(boneRule.BoneName) - Origin).GetSafeNormal() * DamageType->DamageImpulse;
 			DamageBone(Damage, boneRule.BoneName, DamageType, InstigatedBy, impulse, Origin);
@@ -97,17 +118,15 @@ bool USkeletalDismembermentMesh::DamageBone(float damage, FName boneName, const 
 	{
 		if (DismembermentBones[i].IsBone(boneName) && (!(DismembermentBones[i].WhitelistedDamageTypes.Num() > 0) || DismembermentBones[i].WhitelistedDamageTypes.Contains(DamageType)))
 		{
-			// TODO: Getting to here
-			// GEngine->AddOnScreenDebugMessage(1212, 2.f, FColor::Red, TEXT("Check"));
 			bRetVal = true;
 			OnBoneDamageReceived.Broadcast(boneName, damage, DismembermentBones[i].CumulativeBreakThreshold - damage, damageInstigator);
 			bool bInstigatorAlreadyAdded = false;
-			for (FDismembermentDamageInstigator instigator : DismembermentBones[i].DamageInstigators)
+			for (int j=0;j< DismembermentBones[i].DamageInstigators.Num();j++)
 			{
-				if (instigator.DamageInstigator == damageInstigator)
+				if (DismembermentBones[i].DamageInstigators[j].DamageInstigator == damageInstigator)
 				{
-					instigator.DamageDealt += damage;
-					instigator.LastGameTimeOfDamageDealt = GetWorld()->TimeSeconds;
+					DismembermentBones[i].DamageInstigators[j].DamageDealt += damage;
+					DismembermentBones[i].DamageInstigators[j].LastGameTimeOfDamageDealt = GetWorld()->TimeSeconds;
 					bInstigatorAlreadyAdded = true;
 				}
 			}

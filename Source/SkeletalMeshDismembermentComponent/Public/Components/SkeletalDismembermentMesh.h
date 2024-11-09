@@ -4,7 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "HAL/Event.h"
 #include "SkeletalDismembermentMesh.generated.h"
+
+DECLARE_DYNAMIC_DELEGATE_NineParams(FOnPointDamageTakenDel, AActor*, DamagedActor, float, Damage, AController*, InstigatedBy, FVector, HitLocation, UPrimitiveComponent*, HitComponent, FName, BoneName, FVector, ShotFromDirection, const UDamageType*, DamageType, AActor*, DamageCauser);
+DECLARE_DYNAMIC_DELEGATE_SevenParams(FOnRadialDamageTakenDel, AActor*, DamagedActor, float, Damage, const UDamageType*, DamageType, FVector, Origin, const FHitResult&, HitInfo, AController*, InstigatedBy, AActor*, DamageCauser);
 
 UENUM(BlueprintType)
 enum ESimulateCondition {
@@ -221,6 +225,12 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Dismemberment")
 	float GetBoneHealth(FName boneName) const;
 
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Dismemberment")
+	void RebindPointDamage(FOnPointDamageTakenDel function);
+	FScriptDelegate CurrentPointDelegate;
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Dismemberment")
+	void RebindRadialDamage(FOnRadialDamageTakenDel function);
+	FScriptDelegate CurrentRadialDelegate;
 protected:
 	/*
 	* List of bones that can be dismembered and the rules for dismemberment.
